@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* Habilita a classe .dark no Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 1. Variáveis Nativas de Cores (Modo Claro Padrão) */
+:root {
+  --background: #f8faf9;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --border-color: #e2e8f0;
+
+  --foreground: #192c20;
+  --text-secondary: #4a5d50;
+  --text-muted: #839588;
+
+  --brand-dark-color: #316C4A;
+  --brand-color: #409159;
+  --brand-secondary-color: #69B656;
+  --brand-accent-color: #93C35C;
+  --brand-highlight-color: #B4D066;
+  --brand-light-bg: #f0f7ec;
+}
+
+/* 2. Variáveis para MODO ESCURO */
+.dark {
+  --background: #0e1711;
+  --bg-card: #18261e;
+  --bg-input: #23362b;
+  --border-color: #2b4235;
+
+  --foreground: #ffffff;
+  --text-secondary: #c0cfc5;
+  --text-muted: #728a7b;
+
+  --brand-light-bg: #1d3326;
+}
+
+/* 3. Mapeamento para o Tailwind v4 */
+@theme {
+  --color-brand-dark: var(--brand-dark-color);
+  --color-brand: var(--brand-color);
+  --color-brand-secondary: var(--brand-secondary-color);
+  --color-brand-accent: var(--brand-accent-color);
+  --color-brand-highlight: var(--brand-highlight-color);
+  --color-brand-light: var(--brand-light-bg);
+
+  --color-bg-primary: var(--background);
+  --color-bg-card: var(--bg-card);
+  --color-bg-input: var(--bg-input);
+
+  --color-txt-primary: var(--foreground);
+  --color-txt-secondary: var(--text-secondary);
+  --color-txt-muted: var(--text-muted);
+
+  --color-border-main: var(--border-color);
+}
+
+/* 4. Estilos Globais */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}

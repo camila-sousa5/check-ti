@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🛒 CheckTI - Sistema de Auditoria de TI para Lojas
 
-## Getting Started
+O **CheckTI** é uma plataforma web desenvolvida para simplificar e padronizar as auditorias de tecnologia da informação nas lojas físicas. O sistema permite que auditores realizem checagens de infraestrutura e registrem fotos dos equipamentos.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🚀 Tecnologias Utilizadas
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Frontend / Framework:** [Next.js](https://nextjs.org/) (React & TypeScript)
+- **Estilização:** [Tailwind CSS](https://tailwindcss.com/)
+- **Backend & Banco de Dados:** [Supabase](https://supabase.com/) (PostgreSQL, Auth e Storage)
+- **Autenticação:** Supabase Auth (Email/Senha e Google OAuth)
+- **Hospedagem:** Vercel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ⚙️ Principais Funcionalidades
 
-## Learn More
+- 🔒 **Autenticação Segura & Controle de Acesso:**
+  - Login via e-mail e Google OAuth.
+  - Registro automático de perfis (`profiles`) via Triggers do PostgreSQL.
+  - Permissões diferenciadas por níveis de usuário (`comum`, `admin`, etc.).
 
-To learn more about Next.js, take a look at the following resources:
+- 📝 **Formulário Dinâmico de Auditoria:**
+  - Validação do status de redes, internet e conexões dos PDVs.
+  - Detalhamento individual de cada equipamento (marca, modelo, patrimônio e foto).
+  - Suporte a contagem de módulos para equipamentos específicos (ex: *Mobshop* e *Mobpin*).
+  - Cálculo automático do status de equipamentos com base na contagem de peças com defeito.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- 📊 **Relatório Consolidado de TI:**
+  - Visão geral com indicadores de KPIs (total de auditorias, alertas de rede, falhas de PDV e contagem de defeitos).
+  - Filtros inteligentes por nome de loja e status dos equipamentos.
+  - Cards expansíveis para navegação limpa e ágil.
+  - Visualização inline de fotos anexadas aos chamados/equipamentos.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 📂 Estrutura do Banco de Dados
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **`profiles`**: Armazena as informações básicas e permissões dos usuários (`id`, `email`, `role`).
+- **`lojas`**: Cadastro e dados de identificação das lojas (`nome`, `codigo_loja`).
+- **`auditorias`**: Registros gerais das inspeções em cada unidade.
+- **`equipamentos`**: Itens, status, fotos e especificações técnicas vinculadas a uma auditoria.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🛠️ Como Rodar o Projeto Localmente
+
+1. **Clone o repositório:**
+   ```bash
+   git clone [https://github.com/seu-usuario/seu-repositorio.git](https://github.com/seu-usuario/seu-repositorio.git)
+   cd seu-repositorio
+   ```
+2. **Instale as dependências:**
+    ```bash
+    npm install
+    ```
+3. **Configure as variáveis de ambiente:**
+    Crie um arquivo `.env.local` na raiz do projeto com as credenciais do seu Supabase:
+    ```bash
+    NEXT_PUBLIC_SUPABASE_URL=sua_url_do_supabase
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_anon_do_supabase
+    ```
+4. **Execute o servidor de desenvolvimento:**
+    ```bash
+    npm run dev
+    ```
+    Acesse http://localhost:3000 no seu navegador.
