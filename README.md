@@ -48,7 +48,7 @@ O **CheckTI** é uma plataforma web desenvolvida para simplificar e padronizar a
 
 1. **Clone o repositório:**
    ```bash
-   git clone [https://github.com/seu-usuario/seu-repositorio.git](https://github.com/seu-usuario/seu-repositorio.git)
+   git clone [https://github.com/seu-usuario/seu-repositorio.git](https://github.com/camila-sousa5/check-ti.git)
    cd seu-repositorio
    ```
 2. **Instale as dependências:**
