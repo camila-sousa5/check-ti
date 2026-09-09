@@ -29,13 +29,23 @@ interface AuditoriaItem {
   detalhe_PDV_equipamento: string | null
   problema_fisico: boolean
   detalhe_problema_fisico: string | null
+  tipo_unidade: 'loja' | 'er'
+  validacao_status: 'pendente' | 'aprovado' | 'ajuste_solicitado'
+  parecer_supervisor: string | null
+  validado_por: string | null
+  validado_em: string | null
   lojas?: { nome: string; codigo_loja: string }
+  er?: { nome: string; codigo_er: string }
   equipamentos?: EquipamentoItem[]
 }
+
+const PERFIS_QUE_PODEM_VALIDAR = ['admin', 'gestor', 'auditor_chefe']
 
 export default function RelatorioAuditoria() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [verificandoAcesso, setVerificandoAcesso] = useState(true)
+  const [usuario, setUsuario] = useState<any>(null)
   const [auditorias, setAuditorias] = useState<AuditoriaItem[]>([])
   const [filtroLoja, setFiltroLoja] = useState('')
   const [filtroStatusEquip, setFiltroStatusEquip] = useState('todos')
@@ -43,10 +53,44 @@ export default function RelatorioAuditoria() {
   // Estado para controlar quais cards estão expandidos (guarda o ID das auditorias)
   const [cardsExpandidos, setCardsExpandidos] = useState<Record<string, boolean>>({})
   const [fotoModal, setFotoModal] = useState<string | null>(null)
+  const [ajusteModal, setAjusteModal] = useState<{ id: string; texto: string } | null>(null)
+  const [salvandoValidacao, setSalvandoValidacao] = useState<string | null>(null)
+
+  // Verifica login e permissão antes de liberar o acesso ao relatório
+  useEffect(() => {
+    async function verificarAcesso() {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+      if (userError || !user) {
+        router.replace('/login')
+        return
+      }
+
+      const { data: perfil } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const role = perfil?.role || user.user_metadata?.role
+
+      if (!role || !PERFIS_QUE_PODEM_VALIDAR.includes(String(role).toLowerCase())) {
+        router.replace('/')
+        return
+      }
+
+      setUsuario(user)
+      setVerificandoAcesso(false)
+    }
+
+    verificarAcesso()
+  }, [router])
 
   useEffect(() => {
-    carregarRelatorios()
-  }, [])
+    if (!verificandoAcesso) {
+      carregarRelatorios()
+    }
+  }, [verificandoAcesso])
 
   async function carregarRelatorios() {
     setLoading(true)
@@ -55,6 +99,7 @@ export default function RelatorioAuditoria() {
       .select(`
         *,
         lojas (nome, codigo_loja),
+        er (nome, codigo_er),
         equipamentos (*)
       `)
       .order('created_at', { ascending: false })
@@ -76,6 +121,97 @@ export default function RelatorioAuditoria() {
     }))
   }
 
+  // Aprova a auditoria, liberando o parecer anterior (se houver)
+  const handleAprovar = async (id: string) => {
+    setSalvandoValidacao(id)
+    const validado_em = new Date().toISOString()
+
+    const { error } = await supabase
+      .from('auditorias')
+      .update({
+        validacao_status: 'aprovado',
+        parecer_supervisor: null,
+        validado_por: usuario?.email ?? null,
+        validado_em,
+      })
+      .eq('id', id)
+
+    if (error) {
+      alert('Erro ao aprovar auditoria: ' + error.message)
+    } else {
+      setAuditorias((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, validacao_status: 'aprovado', parecer_supervisor: null, validado_por: usuario?.email ?? null, validado_em }
+            : a
+        )
+      )
+    }
+    setSalvandoValidacao(null)
+  }
+
+  // Registra um pedido de ajuste com o parecer escrito pelo validador
+  const handleConfirmarAjuste = async () => {
+    if (!ajusteModal) return
+
+    if (!ajusteModal.texto.trim()) {
+      alert('Descreva o que precisa ser ajustado antes de enviar.')
+      return
+    }
+
+    const { id, texto } = ajusteModal
+    setSalvandoValidacao(id)
+    const validado_em = new Date().toISOString()
+    const parecer = texto.trim()
+
+    const { error } = await supabase
+      .from('auditorias')
+      .update({
+        validacao_status: 'ajuste_solicitado',
+        parecer_supervisor: parecer,
+        validado_por: usuario?.email ?? null,
+        validado_em,
+      })
+      .eq('id', id)
+
+    if (error) {
+      alert('Erro ao solicitar ajuste: ' + error.message)
+    } else {
+      setAuditorias((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, validacao_status: 'ajuste_solicitado', parecer_supervisor: parecer, validado_por: usuario?.email ?? null, validado_em }
+            : a
+        )
+      )
+      setAjusteModal(null)
+    }
+    setSalvandoValidacao(null)
+  }
+
+  const renderBadgeValidacao = (status: AuditoriaItem['validacao_status']) => {
+    switch (status) {
+      case 'aprovado':
+        return (
+          <span className="text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1">
+            ✓ Aprovado
+          </span>
+        )
+      case 'ajuste_solicitado':
+        return (
+          <span className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold px-2.5 py-1 rounded-full border border-amber-500/30 flex items-center gap-1">
+            ⚠️ Ajuste Solicitado
+          </span>
+        )
+      default:
+        return (
+          <span className="text-xs bg-blue-500/15 text-blue-700 dark:text-blue-400 font-bold px-2.5 py-1 rounded-full border border-blue-500/30 flex items-center gap-1">
+            ⏳ Pendente
+          </span>
+        )
+    }
+  }
+
   // --- CÁLCULO DAS MÉTRICAS DOS KPIS ---
   const totalAuditorias = auditorias.length
 
@@ -95,8 +231,8 @@ export default function RelatorioAuditoria() {
 
   // --- FILTRAGEM ---
   const auditoriasFiltradas = auditorias.filter((aud) => {
-    const nomeLoja = aud.lojas?.nome?.toLowerCase() || ''
-    const matchLoja = nomeLoja.includes(filtroLoja.toLowerCase())
+    const nomeUnidade = (aud.tipo_unidade === 'er' ? aud.er?.nome : aud.lojas?.nome)?.toLowerCase() || ''
+    const matchLoja = nomeUnidade.includes(filtroLoja.toLowerCase())
 
     if (!matchLoja) return false
 
@@ -107,10 +243,10 @@ export default function RelatorioAuditoria() {
     return true
   })
 
-  if (loading) {
+  if (verificandoAcesso || loading) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <p className="text-slate-600 font-medium animate-pulse">Carregando relatório...</p>
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <p className="text-txt-muted font-medium animate-pulse">Carregando relatório...</p>
       </div>
     )
   }
@@ -160,7 +296,7 @@ export default function RelatorioAuditoria() {
         <div className="bg-bg-card text-txt-primary p-4 rounded-xl shadow-sm border border-border-main flex flex-col md:flex-row gap-4 items-center">
           <input
             type="text"
-            placeholder="Buscar por nome da loja..."
+            placeholder="Buscar por nome da loja ou ER..."
             value={filtroLoja}
             onChange={(e) => setFiltroLoja(e.target.value)}
             className="w-full md:w-1/3 p-2.5 border border-border-main bg-bg-input text-txt-primary placeholder:text-txt-muted rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand"
@@ -195,25 +331,30 @@ export default function RelatorioAuditoria() {
             auditoriasFiltradas.map((aud) => {
               const estaExpandido = cardsExpandidos[aud.id] || false
               const qtdEquipamentos = aud.equipamentos?.length || 0
+              const nomeUnidade = aud.tipo_unidade === 'er' ? aud.er?.nome : aud.lojas?.nome
+              const codigoUnidade = aud.tipo_unidade === 'er' ? aud.er?.codigo_er : aud.lojas?.codigo_loja
 
               return (
                 <div
                   key={aud.id}
                   className="bg-bg-card text-txt-primary rounded-xl shadow-sm border border-border-main overflow-hidden transition-all duration-200"
                 >
-                  {/* CABEÇALHO DO CARD DA LOJA (CLICÁVEL) */}
+                  {/* CABEÇALHO DO CARD DA UNIDADE (CLICÁVEL) */}
                   <div
                     onClick={() => toggleExpandir(aud.id)}
                     className="p-5 flex flex-col md:flex-row md:items-center justify-between cursor-pointer hover:bg-bg-primary/50 gap-4"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-txt-muted bg-bg-primary px-1.5 py-0.5 rounded border border-border-main">
+                          {aud.tipo_unidade === 'er' ? 'ER' : 'Loja'}
+                        </span>
                         <h2 className="text-xl font-bold tracking-tight">
-                          {aud.lojas?.nome || 'Loja Não Identificada'}
+                          {nomeUnidade || 'Unidade Não Identificada'}
                         </h2>
-                        {aud.lojas?.codigo_loja && (
+                        {codigoUnidade && (
                           <span className="text-xs font-semibold text-txt-muted bg-bg-primary px-2 py-0.5 rounded border border-border-main">
-                            Cód: {aud.lojas.codigo_loja}
+                            Cód: {codigoUnidade}
                           </span>
                         )}
                       </div>
@@ -226,6 +367,8 @@ export default function RelatorioAuditoria() {
 
                     {/* BADGES E BOTÃO DE EXPANDIR */}
                     <div className="flex items-center gap-3 flex-wrap">
+                      {renderBadgeValidacao(aud.validacao_status)}
+
                       {aud.problema_internet_sistema && (
                         <span className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold px-2.5 py-1 rounded-full border border-amber-500/30">
                           ⚠️ Falha Conexão
@@ -246,6 +389,31 @@ export default function RelatorioAuditoria() {
                         {qtdEquipamentos} {qtdEquipamentos === 1 ? 'equipamento' : 'equipamentos'}
                       </span>
 
+                      {/* AÇÕES DE VALIDAÇÃO */}
+                      {aud.validacao_status !== 'aprovado' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAprovar(aud.id)
+                          }}
+                          disabled={salvandoValidacao === aud.id}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm disabled:opacity-50"
+                        >
+                          ✓ Aprovar
+                        </button>
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setAjusteModal({ id: aud.id, texto: aud.parecer_supervisor ?? '' })
+                        }}
+                        disabled={salvandoValidacao === aud.id}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        ✏️ Solicitar Ajuste
+                      </button>
+
                       {/* BOTÃO EXPANDIR / RECOLHER */}
                       <button
                         onClick={(e) => {
@@ -258,6 +426,17 @@ export default function RelatorioAuditoria() {
                       </button>
                     </div>
                   </div>
+
+                  {/* PARECER REGISTRADO NA ÚLTIMA VALIDAÇÃO */}
+                  {aud.validacao_status === 'ajuste_solicitado' && aud.parecer_supervisor && (
+                    <div className="bg-amber-500/10 border-y border-amber-500/20 p-3.5 px-5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                      <span className="text-base">💬</span>
+                      <div>
+                        <strong className="font-bold">Parecer enviado ao auditor:</strong>
+                        <p className="mt-0.5">{aud.parecer_supervisor}</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* CONTEÚDO EXPANDIDO */}
                   {estaExpandido && (
@@ -361,6 +540,49 @@ export default function RelatorioAuditoria() {
           )}
         </div>
       </div>
+
+      {/* MODAL PARA SOLICITAR AJUSTE */}
+      {ajusteModal && (
+        <div className="fixed inset-0 bg-bg-primary/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-bg-card text-txt-primary rounded-xl p-4 max-w-lg w-full space-y-3 border border-border-main shadow-xl">
+            <div className="flex justify-between items-center border-b border-border-main pb-2">
+              <h3 className="font-bold text-sm">Solicitar Ajuste</h3>
+              <button
+                onClick={() => setAjusteModal(null)}
+                className="text-txt-muted hover:text-txt-primary font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-txt-muted">
+              Descreva o que precisa ser corrigido. O auditor verá esse parecer em "Minhas Auditorias".
+            </p>
+            <textarea
+              rows={4}
+              autoFocus
+              placeholder="Ex: Falta foto do equipamento com defeito na aba Mobshop..."
+              value={ajusteModal.texto}
+              onChange={(e) => setAjusteModal({ ...ajusteModal, texto: e.target.value })}
+              className="w-full p-2.5 border border-border-main rounded-md bg-bg-input text-txt-primary text-sm"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAjusteModal(null)}
+                className="flex-1 py-2 border border-border-main text-txt-secondary hover:bg-bg-primary rounded text-xs font-semibold transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarAjuste}
+                disabled={salvandoValidacao === ajusteModal.id}
+                className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold transition-colors disabled:opacity-50"
+              >
+                {salvandoValidacao === ajusteModal.id ? 'Enviando...' : 'Enviar Parecer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL PARA VER A FOTO DO EQUIPAMENTO */}
       {fotoModal && (
