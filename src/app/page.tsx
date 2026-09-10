@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 import { ThemeToggle } from './components/ThemeToggle'
 
-// Tipos de Equipamento e suas respectivas marcas
-const TIPOS_EQUIPAMENTO = [
+// Tipos de Equipamento base (LOJAS)
+const TIPOS_EQUIPAMENTO_LOJA = [
   {
     id: 'Celular',
     nome: 'Celular da loja',
@@ -25,16 +25,21 @@ const TIPOS_EQUIPAMENTO = [
   {
     id: 'ImpressoraPreco',
     nome: 'Impressora de Preço',
-    marcas: ['Zebra ZD220', 'Outro / Não listado'],
+    marcas: ['Zebra', 'Outro / Não listado'],
   },
   {
     id: 'ImpressoraCupom',
     nome: 'Impressora de Cupom',
-    marcas: ['MP4200', 'Outro / Não listado'],
+    marcas: ['Bematech', 'Outro / Não listado'],
   },
   {
-    id: 'Nobreak',
-    nome: 'Nobreak',
+    id: 'NobreakRack',
+    nome: 'Nobreak do Rack',
+    marcas: ['APC', 'SMS', 'Outro / Não listado'],
+  },
+  {
+    id: 'NobreakPDV',
+    nome: 'Nobreak do PDV',
     marcas: ['APC', 'SMS', 'Outro / Não listado'],
   },
   {
@@ -42,12 +47,75 @@ const TIPOS_EQUIPAMENTO = [
     nome: 'Tablet',
     marcas: ['Samsung', 'Lenovo', 'Outro / Não listado'],
   },
+  {
+    id: 'TotemCarregamento',
+    nome: 'Totem de Carregamento',
+    marcas: [],
+  },
+  {
+    id: 'SomLoja',
+    nome: 'Som da Loja',
+    marcas: [],
+  },
+  {
+    id: 'VelocidadeWifi',
+    nome: 'Velocidade do Wi-fi',
+    marcas: [],
+  },
 ]
 
-// Lista consolidada de todas as abas
-const ABAS = [
-  { id: 'geral', nome: 'Geral' },
-  ...TIPOS_EQUIPAMENTO.map((t) => ({ id: t.id, nome: t.nome })),
+// Tipos de Equipamento base (ERs)
+const TIPOS_EQUIPAMENTO_ER = [
+  {
+    id: 'Celular',
+    nome: 'Celular da loja',
+    marcas: ['Samsung', 'Apple', 'Outro / Não listado'],
+  },
+  {
+    id: 'CelularVDI',
+    nome: 'Celulares VDI',
+    marcas: ['Samsung', 'Apple', 'Outro / Não listado'],
+  },
+  {
+    id: 'ImpressoraPreco',
+    nome: 'Impressora de Preço',
+    marcas: ['Zebra', 'Outro / Não listado'],
+  },
+  {
+    id: 'ImpressoraCupom',
+    nome: 'Impressora de Cupom',
+    marcas: ['Bematech', 'Outro / Não listado'],
+  },
+  {
+    id: 'NobreakRack',
+    nome: 'Nobreak do Rack',
+    marcas: ['APC', 'SMS', 'Outro / Não listado'],
+  },
+  {
+    id: 'NobreakPDV',
+    nome: 'Nobreak do PDV',
+    marcas: ['APC', 'SMS', 'Outro / Não listado'],
+  },
+  {
+    id: 'Tablet',
+    nome: 'Tablet',
+    marcas: ['Samsung', 'Lenovo', 'Outro / Não listado'],
+  },
+  {
+    id: 'TotemCarregamento',
+    nome: 'Totem de Carregamento',
+    marcas: [],
+  },
+  {
+    id: 'SomLoja',
+    nome: 'Som da Loja',
+    marcas: [],
+  },
+  {
+    id: 'VelocidadeWifi',
+    nome: 'Velocidade do Wi-fi',
+    marcas: [],
+  },
 ]
 
 interface Loja {
@@ -67,6 +135,7 @@ type TipoUnidade = 'loja' | 'er'
 export default function AuditoriaForm() {
   const router = useRouter()
   const [podeVerRelatorio, setPodeVerRelatorio] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [usuario, setUsuario] = useState<any>(null)
   const [checandoAuth, setChecandoAuth] = useState(true)
 
@@ -77,6 +146,15 @@ export default function AuditoriaForm() {
   const [unidadeSelecionada, setUnidadeSelecionada] = useState('')
   const [abaAtual, setAbaAtual] = useState(0)
   const [carregando, setCarregando] = useState(false)
+
+  // Seleciona a lista de equipamentos dinamicamente baseada no tipo de unidade
+  const tiposEquipamentoAtuais = tipoUnidade === 'loja' ? TIPOS_EQUIPAMENTO_LOJA : TIPOS_EQUIPAMENTO_ER
+
+  // Lista de abas dinâmica
+  const ABAS = [
+    { id: 'geral', nome: 'Geral' },
+    ...tiposEquipamentoAtuais.map((t) => ({ id: t.id, nome: t.nome })),
+  ]
 
   // 1. Verificação Única de Autenticação e Permissões
   useEffect(() => {
@@ -91,13 +169,10 @@ export default function AuditoriaForm() {
 
       setUsuario(user)
 
-      // 🔴 1. VERIFICAÇÃO VIA METADATA NATIVA DO SUPABASE (Opcional se você salvou a role ao criar o usuário)
       const roleUserMetadata = user.user_metadata?.role
 
-      // 🔴 2. BUSCA DA ROLE NO BANCO DE DADOS
-      // Verifique se a sua tabela chama 'users' ou 'profiles'
       const { data: perfil, error: perfilError } = await supabase
-        .from('profiles') // ⚠️ Se sua tabela for 'profiles', mude para 'profiles'
+        .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle()
@@ -106,22 +181,15 @@ export default function AuditoriaForm() {
         console.error('Erro ao buscar perfil do usuário no Supabase:', perfilError.message)
       }
 
-      console.log('Dados do usuário autenticado:', user)
-      console.log('Perfil retornado da tabela:', perfil)
-
-      // Pega a role vinda da tabela ou da metadata do auth
       const userRole = perfil?.role || roleUserMetadata
+      const perfisPermitidos = ['admin', 'super-admin']
 
-      console.log('Role identificada:', userRole)
-
-      const perfisPermitidos = ['admin', 'gestor', 'auditor_chefe']
-
-      // Compara ignorando diferenças de maiúsculas/minúsculas
       if (userRole && perfisPermitidos.includes(String(userRole).toLowerCase())) {
-        console.log('✅ Permissão concedida! Exibindo botão de relatório.')
         setPodeVerRelatorio(true)
-      } else {
-        console.warn('❌ Permissão negada para o perfil:', userRole)
+      }
+
+      if (userRole && String(userRole).toLowerCase() === 'super-admin') {
+        setIsSuperAdmin(true)
       }
 
       setChecandoAuth(false)
@@ -130,7 +198,7 @@ export default function AuditoriaForm() {
     inicializarAuth()
   }, [router])
 
-  // Estado das perguntas gerais da loja
+  // Estado das perguntas gerais da loja/ER
   const [dadosGerais, setDadosGerais] = useState({
     problema_internet_sistema: false,
     detalhe_internet_sistema: '',
@@ -140,17 +208,21 @@ export default function AuditoriaForm() {
     detalhe_problema_fisico: '',
   })
 
-  // Estado dos equipamentos
-  // OBS: "status: null" nos equipamentos comuns força o usuário a escolher
-  // explicitamente OK/Defeito em vez de assumir "ok" por padrão.
+  // Estado dos equipamentos atualizado com NobreakRack e NobreakPDV
   const [dadosFormulario, setDadosFormulario] = useState<Record<string, any>>({
     Celular: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
     Mobshop: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: 'ok', observacoes: '', foto: null, qtd_funcionando: '', qtd_defeito: '', tem_reserva: null, qtd_reserva: '' },
     Mobpin: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: 'ok', observacoes: '', foto: null, qtd_funcionando: '', qtd_defeito: '', tem_reserva: null, qtd_reserva: '' },
+    CelularVDI: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: 'ok', observacoes: '', foto: null, qtd_funcionando: '', qtd_defeito: '', tem_reserva: null, qtd_reserva: '' },
     ImpressoraPreco: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
     ImpressoraCupom: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
-    Nobreak: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
+    NobreakRack: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
+    NobreakPDV: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
     Tablet: { marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
+    TotemCarregamento: { possui: null, marca: '', marca_custom: '', modelo: '', patrimonio: '', status: null, observacoes: '', foto: null },
+    SomLoja: { possui: null, status: null, observacoes: '' },
+    VelocidadeWifi: { velocidade_pdv: '', velocidade_loja: '', status: 'ok', observacoes: '' },
+
   })
 
   // 2. Busca a lista de lojas e ERs no Supabase
@@ -183,9 +255,10 @@ export default function AuditoriaForm() {
     }
   }, [usuario])
 
-  // Reseta a unidade selecionada ao trocar entre Loja e ER
+  // Reseta a unidade selecionada e a aba ao trocar entre Loja e ER
   useEffect(() => {
     setUnidadeSelecionada('')
+    setAbaAtual(0)
   }, [tipoUnidade])
 
   const unidades = tipoUnidade === 'loja' ? lojas : ers
@@ -222,6 +295,51 @@ export default function AuditoriaForm() {
     handleChange(tipo, 'status', defeito > 0 ? 'defeito' : 'ok')
   }
 
+  // Helper para identificar se um equipamento usa fluxo de contagem (Mobshop, Mobpin, CelularVDI)
+  const ehEquipamentoContagem = (id: string) => {
+    return id === 'Mobshop' || id === 'Mobpin' || id === 'CelularVDI'
+  }
+
+  // --- FUNÇÃO PARA TESTES RÁPIDOS ---
+  const preencherDadosTeste = () => {
+    // Seleciona a primeira loja disponível para não dar erro de validação
+    if (lojas.length > 0) {
+      setTipoUnidade('loja')
+      setUnidadeSelecionada(lojas[0].id)
+    } else if (ers.length > 0) {
+      setTipoUnidade('er')
+      setUnidadeSelecionada(ers[0].id)
+    } else {
+      alert('Atenção: Nenhuma loja ou ER carregada do banco. O envio pode falhar.')
+    }
+
+    setDadosGerais({
+      problema_internet_sistema: false,
+      detalhe_internet_sistema: '',
+      problema_PDV_equipamento: false,
+      detalhe_PDV_equipamento: '',
+      problema_fisico: false,
+      detalhe_problema_fisico: '',
+    })
+
+    setDadosFormulario({
+      Celular: { marca: 'Samsung', marca_custom: '', modelo: 'Galaxy A54', patrimonio: 'PAT-1001', status: 'ok', observacoes: 'Teste automatizado', foto: null },
+      Mobshop: { marca: 'Samsung', marca_custom: '', modelo: '', patrimonio: '', status: 'ok', observacoes: '', foto: null, qtd_funcionando: 5, qtd_defeito: 0, tem_reserva: true, qtd_reserva: 2 },
+      Mobpin: { marca: 'Mooz', marca_custom: '', modelo: '', patrimonio: '', status: 'defeito', observacoes: 'Um deles está com a tela trincada', foto: null, qtd_funcionando: 3, qtd_defeito: 1, tem_reserva: false, qtd_reserva: 0 },
+      CelularVDI: { marca: 'Samsung', marca_custom: '', modelo: '', patrimonio: '', status: 'ok', observacoes: '', foto: null, qtd_funcionando: 10, qtd_defeito: 0, tem_reserva: true, qtd_reserva: 5 },
+      ImpressoraPreco: { marca: 'Zebra', marca_custom: '', modelo: 'ZD220', patrimonio: 'PAT-1002', status: 'ok', observacoes: '', foto: null },
+      ImpressoraCupom: { marca: 'Bematech', marca_custom: '', modelo: 'MP4200', patrimonio: 'PAT-1003', status: 'ok', observacoes: '', foto: null },
+      NobreakRack: { marca: 'APC', marca_custom: '', modelo: 'Smart-UPS', patrimonio: 'PAT-1004', status: 'ok', observacoes: '', foto: null },
+      NobreakPDV: { marca: 'SMS', marca_custom: '', modelo: 'Station II', patrimonio: 'PAT-1005', status: 'ok', observacoes: '', foto: null },
+      Tablet: { marca: 'Lenovo', marca_custom: '', modelo: 'Tab M10', patrimonio: 'PAT-1006', status: 'ok', observacoes: '', foto: null },
+      TotemCarregamento: { possui: true, marca: '', marca_custom: '', modelo: '', patrimonio: '', status: 'ok', observacoes: 'Funcionando perfeitamente', foto: null },
+      SomLoja: { possui: false, status: null, observacoes: '' }, // Simula que a loja NÃO tem som
+      VelocidadeWifi: { velocidade_pdv: '50', velocidade_loja: '120', status: 'ok', observacoes: 'Sinal estável e dentro da métrica' },
+    })
+
+    alert('✅ Dados de teste preenchidos com sucesso! Você pode pular para a última aba e salvar.')
+  }
+
   // 3. Envio final da auditoria com validação reforçada
   const handleSubmit = async () => {
     // --- Validação: Unidade selecionada ---
@@ -231,7 +349,7 @@ export default function AuditoriaForm() {
       return
     }
 
-    // --- Validação: Aba Geral — detalhes obrigatórios quando "Sim" é marcado ---
+    // --- Validação: Aba Geral ---
     if (dadosGerais.problema_internet_sistema && !dadosGerais.detalhe_internet_sistema?.trim()) {
       alert('Por favor, descreva o problema de internet/sistema relatado.')
       setAbaAtual(0)
@@ -248,11 +366,11 @@ export default function AuditoriaForm() {
       return
     }
 
-    // --- Validação: cada equipamento (com navegação até a aba com erro) ---
-    for (let i = 0; i < TIPOS_EQUIPAMENTO.length; i++) {
-      const tipoObj = TIPOS_EQUIPAMENTO[i]
+    // --- Validação: cada equipamento ativo na lista atual ---
+    for (let i = 0; i < tiposEquipamentoAtuais.length; i++) {
+      const tipoObj = tiposEquipamentoAtuais[i]
       const item = dadosFormulario[tipoObj.id]
-      const indiceAba = i + 1 // aba 0 é "Geral"
+      const indiceAba = i + 1
 
       // Marca customizada exige descrição e foto
       if (item.marca === 'Outro / Não listado') {
@@ -268,8 +386,27 @@ export default function AuditoriaForm() {
         }
       }
 
-      if (tipoObj.id === 'Mobshop' || tipoObj.id === 'Mobpin') {
-        // Quantidades obrigatórias, numéricas e não-negativas
+      if (tipoObj.id === 'VelocidadeWifi') {
+        if (!item.velocidade_pdv || !item.velocidade_loja) {
+          alert(`Por favor, informe a velocidade do Wi-fi do PDV e da Loja.`)
+          setAbaAtual(indiceAba)
+          return
+        }
+        continue
+      }
+
+      if (tipoObj.id === 'TotemCarregamento' || tipoObj.id === 'SomLoja') {
+        if (item.possui === null) {
+          alert(`Por favor, informe se a unidade possui "${tipoObj.nome}".`)
+          setAbaAtual(indiceAba)
+          return
+        }
+        if (item.possui === false) {
+          continue // Pula o resto da validação deste item
+        }
+      }
+
+      if (ehEquipamentoContagem(tipoObj.id)) {
         if (item.qtd_funcionando === '' || item.qtd_defeito === '') {
           alert(`Por favor, informe as quantidades de unidades funcionando e com defeito para "${tipoObj.nome}".`)
           setAbaAtual(indiceAba)
@@ -291,21 +428,18 @@ export default function AuditoriaForm() {
           return
         }
 
-        // "Tem reserva?" precisa ser respondido explicitamente
         if (item.tem_reserva !== true && item.tem_reserva !== false) {
-          alert(`Por favor, informe se há dispositivo reserva na loja para "${tipoObj.nome}".`)
+          alert(`Por favor, informe se há dispositivo reserva para "${tipoObj.nome}".`)
           setAbaAtual(indiceAba)
           return
         }
       } else {
-        // Status obrigatório para equipamentos "simples"
         if (item.status !== 'ok' && item.status !== 'defeito') {
           alert(`Por favor, selecione o status (OK ou Defeito) do equipamento "${tipoObj.nome}".`)
           setAbaAtual(indiceAba)
           return
         }
 
-        // Se está com defeito, exige descrição em observações
         if (item.status === 'defeito' && !item.observacoes?.trim()) {
           alert(`Por favor, descreva o defeito encontrado em "${tipoObj.nome}" no campo de observações.`)
           setAbaAtual(indiceAba)
@@ -349,9 +483,15 @@ export default function AuditoriaForm() {
       if (errAuditoria) throw errAuditoria
       auditoriaIdCriada = auditoria.id
 
-      for (const tipoObj of TIPOS_EQUIPAMENTO) {
+      for (const tipoObj of tiposEquipamentoAtuais) {
         const item = dadosFormulario[tipoObj.id]
+
+        if ((tipoObj.id === 'TotemCarregamento' || tipoObj.id === 'SomLoja') && item.possui === false) {
+          continue
+        }
+
         let fotoUrl = null
+
 
         if (item.foto) {
           const fileExt = item.foto.name?.split('.').pop()?.toLowerCase() || 'jpg'
@@ -389,14 +529,18 @@ export default function AuditoriaForm() {
           tipo: tipoObj.id,
           marca: marcaFinal,
           marca_custom: item.marca === 'Outro / Não listado' ? item.marca_custom.trim() : null,
-          modelo: item.modelo?.trim() || null,
-          patrimonio: item.patrimonio?.trim() || null,
+          modelo: tipoObj.id === 'Mobpin' ? null : (item.modelo?.trim() || null),
+          patrimonio: tipoObj.id === 'Mobpin' ? null : (item.patrimonio?.trim() || null),
           status: item.status,
           observacoes: item.observacoes?.trim() || null,
           foto_url: fotoUrl,
         }
 
-        if (tipoObj.id === 'Mobshop' || tipoObj.id === 'Mobpin') {
+        if (tipoObj.id === 'VelocidadeWifi') {
+          payloadEquipamento.observacoes = `PDV: ${item.velocidade_pdv} Mbps | Loja: ${item.velocidade_loja} Mbps. ${item.observacoes ? '- Obs: ' + item.observacoes : ''}`.trim()
+        }
+
+        if (ehEquipamentoContagem(tipoObj.id)) {
           payloadEquipamento.qtd_funcionando = Number(item.qtd_funcionando) || 0
           payloadEquipamento.qtd_defeito = Number(item.qtd_defeito) || 0
           payloadEquipamento.tem_reserva = Boolean(item.tem_reserva)
@@ -411,10 +555,8 @@ export default function AuditoriaForm() {
       }
 
       alert('Auditoria salva com sucesso!')
-      // router.push('/sucesso')
     } catch (error: any) {
       if (auditoriaIdCriada) {
-        // Rollback simples caso algo falhe no envio dos equipamentos
         await supabase.from('auditorias').delete().eq('id', auditoriaIdCriada)
       }
       alert('Erro ao salvar auditoria: ' + error.message)
@@ -431,7 +573,7 @@ export default function AuditoriaForm() {
     )
   }
 
-  const equipamentoAtual = abaAtual > 0 ? TIPOS_EQUIPAMENTO[abaAtual - 1] : null
+  const equipamentoAtual = abaAtual > 0 ? tiposEquipamentoAtuais[abaAtual - 1] : null
   const dadosAtuais = equipamentoAtual ? dadosFormulario[equipamentoAtual.id] : null
 
   return (
@@ -447,10 +589,9 @@ export default function AuditoriaForm() {
           </div>
 
           <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
-            {/* BOTÃO PARA MINHAS AUDITORIAS */}
             <button
               type="button"
-              onClick={() => router.push('/minhas-auditorias')} // Ajuste o caminho da sua rota
+              onClick={() => router.push('/minhas-auditorias')}
               className="text-xs font-semibold text-brand hover:bg-brand/10 bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 shrink-0"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -475,7 +616,7 @@ export default function AuditoriaForm() {
           </div>
         </div>
 
-        {podeVerRelatorio && (
+        {(podeVerRelatorio || isSuperAdmin) && (
           <div className="mb-6">
             <button
               type="button"
@@ -489,6 +630,20 @@ export default function AuditoriaForm() {
             </button>
           </div>
         )}
+
+        {/* BOTÃO DE TESTE (Remova antes de ir para Produção) */}
+        {isSuperAdmin && (
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={preencherDadosTeste}
+              className="w-full py-2 bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-300 border-dashed rounded-lg text-sm font-bold transition-colors"
+            >
+              🧪 Preencher Dados de Teste Automaticamente
+            </button>
+          </div>
+        )}
+
 
         {/* 1. SELEÇÃO DA UNIDADE (LOJA OU ER) */}
         <div className="mb-6">
@@ -713,233 +868,309 @@ export default function AuditoriaForm() {
                 Detalhamento: {equipamentoAtual.nome}
               </h2>
 
-              {/* SE FOR MOBSHOP OU MOBPIN */}
-              {(equipamentoAtual.id === 'Mobshop' || equipamentoAtual.id === 'Mobpin') && (
-                <div className="p-4 bg-brand-light border border-brand-accent rounded-lg space-y-4">
-                  <h3 className="text-sm font-bold text-brand-dark border-b border-brand-accent pb-1">
-                    Contagem de Unidades ({equipamentoAtual.nome})
-                  </h3>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold mb-1 text-txt-secondary">
-                        Qtd. Funcionando *
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={dadosAtuais.qtd_funcionando}
-                        onChange={(e) => handleQuantidadeChange(equipamentoAtual.id, 'qtd_funcionando', e.target.value)}
-                        className="w-full p-2.5 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold mb-1 text-txt-secondary">
-                        Qtd. com Defeito *
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={dadosAtuais.qtd_defeito}
-                        onChange={(e) => handleQuantidadeChange(equipamentoAtual.id, 'qtd_defeito', e.target.value)}
-                        className="w-full p-2.5 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
-                      />
-                    </div>
-                  </div>
-
+              {/* ABA EXCLUSIVA DO WI-FI */}
+              {equipamentoAtual.id === 'VelocidadeWifi' && (
+                <div className="p-4 bg-bg-primary border border-border-main rounded-lg space-y-4 mb-2">
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-txt-secondary">
-                      Possui dispositivo reserva na loja? *
+                    <label className="block text-sm font-semibold mb-1 text-txt-primary">
+                      Velocidade do Wi-Fi - PDV (Mbps) *
                     </label>
-                    <div className="flex gap-4 mt-1">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer text-txt-secondary">
-                        <input
-                          type="radio"
-                          name={`reserva_${equipamentoAtual.id}`}
-                          checked={dadosAtuais.tem_reserva === true}
-                          onChange={() => handleChange(equipamentoAtual.id, 'tem_reserva', true)}
-                          className="w-4 h-4 text-brand"
-                        />
-                        Sim
-                      </label>
-                      <label className="flex items-center gap-2 text-sm cursor-pointer text-txt-secondary">
-                        <input
-                          type="radio"
-                          name={`reserva_${equipamentoAtual.id}`}
-                          checked={dadosAtuais.tem_reserva === false}
-                          onChange={() => {
-                            handleChange(equipamentoAtual.id, 'tem_reserva', false)
-                            handleChange(equipamentoAtual.id, 'qtd_reserva', 0) // Zera a quantidade se mudar para Não
-                          }}
-                          className="w-4 h-4 text-brand"
-                        />
-                        Não
-                      </label>
-                    </div>
-
-                    {/* CAMPO DE QUANTIDADE DE RESERVA (Aparece apenas se selecionar "Sim") */}
-                    {dadosAtuais.tem_reserva && (
-                      <div className="mt-3 animate-in fade-in duration-200">
-                        <label className="block text-xs font-semibold mb-1 text-txt-secondary">
-                          Quantidade de dispositivos reserva *
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="Ex: 2"
-                          value={dadosAtuais.qtd_reserva || ''}
-                          onChange={(e) =>
-                            handleChange(
-                              equipamentoAtual.id,
-                              'qtd_reserva',
-                              e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10) || 0)
-                            )
-                          }
-                          className="w-full p-2.5 border border-border-main bg-bg-primary text-txt-primary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                        />
-                      </div>
-                    )}
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Ex: 50"
+                      value={dadosAtuais.velocidade_pdv}
+                      onChange={(e) => handleChange(equipamentoAtual.id, 'velocidade_pdv', e.target.value)}
+                      className="w-full p-2.5 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1 text-txt-primary">
+                      Velocidade do Wi-Fi - Loja/Funcionários (Mbps) *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Ex: 100"
+                      value={dadosAtuais.velocidade_loja}
+                      onChange={(e) => handleChange(equipamentoAtual.id, 'velocidade_loja', e.target.value)}
+                      className="w-full p-2.5 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                    />
                   </div>
                 </div>
               )}
 
-              {/* Marca */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-txt-primary">
-                  Marca <span className="text-xs text-txt-muted font-normal">(opcional)</span>
-                </label>
-                <select
-                  value={dadosAtuais.marca}
-                  onChange={(e) => handleChange(equipamentoAtual.id, 'marca', e.target.value)}
-                  className="w-full p-3 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
-                >
-                  <option value="">Selecione ou deixe em branco...</option>
-                  {equipamentoAtual.marcas.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Marca Customizada e Foto */}
-              {dadosAtuais.marca === 'Outro / Não listado' && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1 text-amber-600 dark:text-amber-400">
-                      Descreva a Marca/Modelo *
+              {/* PERGUNTA DE POSSE (TOTEM OU SOM DA LOJA) */}
+              {(equipamentoAtual.id === 'TotemCarregamento' || equipamentoAtual.id === 'SomLoja') && (
+                <div className="p-4 bg-bg-primary border border-border-main rounded-lg space-y-3 mb-2">
+                  <label className="block text-sm font-semibold text-txt-primary">
+                    A unidade possui {equipamentoAtual.nome}? *
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer text-txt-secondary">
+                      <input
+                        type="radio"
+                        name={`possui_${equipamentoAtual.id}`}
+                        checked={dadosAtuais.possui === true}
+                        onChange={() => handleChange(equipamentoAtual.id, 'possui', true)}
+                        className="w-4 h-4 text-brand"
+                      />
+                      Sim
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Xiaomi, Asus, TP-Link..."
-                      value={dadosAtuais.marca_custom}
-                      onChange={(e) => handleChange(equipamentoAtual.id, 'marca_custom', e.target.value)}
-                      className={`w-full p-2.5 border rounded-md bg-bg-input text-txt-primary text-sm ${!dadosAtuais.marca_custom.trim() ? 'border-red-400' : 'border-border-main'
+                    <label className="flex items-center gap-2 text-sm cursor-pointer text-txt-secondary">
+                      <input
+                        type="radio"
+                        name={`possui_${equipamentoAtual.id}`}
+                        checked={dadosAtuais.possui === false}
+                        onChange={() => {
+                          handleChange(equipamentoAtual.id, 'possui', false)
+                          handleChange(equipamentoAtual.id, 'status', null)
+                          handleChange(equipamentoAtual.id, 'observacoes', '')
+                        }}
+                        className="w-4 h-4 text-brand"
+                      />
+                      Não
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* MOSTRA O RESTANTE DOS CAMPOS APENAS SE A RESPOSTA FOR 'SIM' OU SE FOR OUTRO EQUIPAMENTO NORMAL */}
+              {((equipamentoAtual.id !== 'TotemCarregamento' && equipamentoAtual.id !== 'SomLoja') || dadosAtuais.possui === true) && (
+                <>
+                  {/* SE FOR MOBSHOP, MOBPIN OU CELULARES VDI (CONTAGEM) */}
+                  {ehEquipamentoContagem(equipamentoAtual.id) && (
+                    <div className="p-4 bg-brand-light border border-brand-accent rounded-lg space-y-4">
+                      <h3 className="text-sm font-bold text-brand-dark border-b border-brand-accent pb-1">
+                        Contagem de Unidades ({equipamentoAtual.nome})
+                      </h3>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold mb-1 text-txt-secondary">
+                            Qtd. Funcionando *
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={dadosAtuais.qtd_funcionando}
+                            onChange={(e) => handleQuantidadeChange(equipamentoAtual.id, 'qtd_funcionando', e.target.value)}
+                            className="w-full p-2.5 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold mb-1 text-txt-secondary">
+                            Qtd. com Defeito *
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={dadosAtuais.qtd_defeito}
+                            onChange={(e) => handleQuantidadeChange(equipamentoAtual.id, 'qtd_defeito', e.target.value)}
+                            className="w-full p-2.5 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold mb-1 text-txt-secondary">
+                          Possui dispositivo reserva na {tipoUnidade === 'loja' ? 'loja' : 'ER'}? *
+                        </label>
+                        <div className="flex gap-4 mt-1">
+                          <label className="flex items-center gap-2 text-sm cursor-pointer text-txt-secondary">
+                            <input
+                              type="radio"
+                              name={`reserva_${equipamentoAtual.id}`}
+                              checked={dadosAtuais.tem_reserva === true}
+                              onChange={() => handleChange(equipamentoAtual.id, 'tem_reserva', true)}
+                              className="w-4 h-4 text-brand"
+                            />
+                            Sim
+                          </label>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer text-txt-secondary">
+                            <input
+                              type="radio"
+                              name={`reserva_${equipamentoAtual.id}`}
+                              checked={dadosAtuais.tem_reserva === false}
+                              onChange={() => {
+                                handleChange(equipamentoAtual.id, 'tem_reserva', false)
+                                handleChange(equipamentoAtual.id, 'qtd_reserva', 0)
+                              }}
+                              className="w-4 h-4 text-brand"
+                            />
+                            Não
+                          </label>
+                        </div>
+
+                        {dadosAtuais.tem_reserva && (
+                          <div className="mt-3 animate-in fade-in duration-200">
+                            <label className="block text-xs font-semibold mb-1 text-txt-secondary">
+                              Quantidade de dispositivos reserva *
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="Ex: 2"
+                              value={dadosAtuais.qtd_reserva || ''}
+                              onChange={(e) =>
+                                handleChange(
+                                  equipamentoAtual.id,
+                                  'qtd_reserva',
+                                  e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10) || 0)
+                                )
+                              }
+                              className="w-full p-2.5 border border-border-main bg-bg-primary text-txt-primary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Marca (Omitido no Totem, SomLoja e VelocidadeWifi) */}
+                  {equipamentoAtual.id !== 'TotemCarregamento' && equipamentoAtual.id !== 'SomLoja' && equipamentoAtual.id !== 'VelocidadeWifi' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1 text-txt-primary">
+                        Marca <span className="text-xs text-txt-muted font-normal">(opcional)</span>
+                      </label>
+                      <select
+                        value={dadosAtuais.marca}
+                        onChange={(e) => handleChange(equipamentoAtual.id, 'marca', e.target.value)}
+                        className="w-full p-3 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
+                      >
+                        <option value="">Selecione ou deixe em branco...</option>
+                        {equipamentoAtual.marcas.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Marca Customizada e Foto (Omitido no Totem, SomLoja e VelocidadeWifi) */}
+                  {equipamentoAtual.id !== 'TotemCarregamento' && equipamentoAtual.id !== 'SomLoja' && equipamentoAtual.id !== 'VelocidadeWifi' && dadosAtuais.marca === 'Outro / Não listado' && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1 text-amber-600 dark:text-amber-400">
+                          Descreva a Marca/Modelo *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Xiaomi, Asus, TP-Link..."
+                          value={dadosAtuais.marca_custom}
+                          onChange={(e) => handleChange(equipamentoAtual.id, 'marca_custom', e.target.value)}
+                          className={`w-full p-2.5 border rounded-md bg-bg-input text-txt-primary text-sm ${!dadosAtuais.marca_custom.trim() ? 'border-red-400' : 'border-border-main'
+                            }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold mb-1 text-amber-600 dark:text-amber-400">
+                          Foto do Equipamento *
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={(e) =>
+                            handleChange(equipamentoAtual.id, 'foto', e.target.files?.[0] || null)
+                          }
+                          className="w-full text-xs text-txt-muted file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white"
+                        />
+                        {!dadosAtuais.foto && (
+                          <p className="text-xs text-red-500 mt-1">Foto obrigatória para marcas não listadas.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Modelo (Omitido no Mobpin, Totem, SomLoja e VelocidadeWifi) */}
+                  {equipamentoAtual.id !== 'Mobpin' && equipamentoAtual.id !== 'TotemCarregamento' && equipamentoAtual.id !== 'SomLoja' && equipamentoAtual.id !== 'VelocidadeWifi' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1 text-txt-primary">Modelo</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Galaxy A14 / Vostro 3400"
+                        value={dadosAtuais.modelo}
+                        onChange={(e) => handleChange(equipamentoAtual.id, 'modelo', e.target.value)}
+                        className="w-full p-3 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* Patrimônio (Omitido no Mobpin, Totem, SomLoja e VelocidadeWifi) */}
+                  {equipamentoAtual.id !== 'Mobpin' && equipamentoAtual.id !== 'TotemCarregamento' && equipamentoAtual.id !== 'SomLoja' && equipamentoAtual.id !== 'VelocidadeWifi' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1 text-txt-primary">Patrimônio</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 00123"
+                        value={dadosAtuais.patrimonio}
+                        onChange={(e) => handleChange(equipamentoAtual.id, 'patrimonio', e.target.value)}
+                        className="w-full p-3 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* STATUS GERAL - OMITIDO EM MOBSHOP, MOBPIN, CELULAR VDI E VELOCIDADEWIFI */}
+                  {!ehEquipamentoContagem(equipamentoAtual.id) && equipamentoAtual.id !== 'VelocidadeWifi' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1 text-txt-primary text-left">
+                        Status Geral do Equipamento *
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto">
+                        {[
+                          { label: 'OK', val: 'ok' },
+                          { label: 'Defeito', val: 'defeito' },
+                        ].map((st) => (
+                          <button
+                            key={st.val}
+                            type="button"
+                            onClick={() => handleChange(equipamentoAtual.id, 'status', st.val)}
+                            className={`p-2.5 rounded-lg border text-xs font-semibold transition-all flex items-center justify-center text-center ${dadosAtuais.status === st.val
+                              ? 'bg-brand text-white border-brand'
+                              : 'border-border-main text-txt-secondary hover:bg-bg-primary'
+                              }`}
+                          >
+                            {st.label}
+                          </button>
+                        ))}
+                      </div>
+                      {dadosAtuais.status !== 'ok' && dadosAtuais.status !== 'defeito' && (
+                        <p className="text-xs text-red-500 mt-1 text-center">Selecione o status do equipamento.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Observações */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-txt-primary">
+                      Observações
+                      {dadosAtuais.status === 'defeito' && !ehEquipamentoContagem(equipamentoAtual.id) && equipamentoAtual.id !== 'VelocidadeWifi' && (
+                        <span className="text-red-500"> * (descreva o defeito)</span>
+                      )}
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Algum detalhe adicional..."
+                      value={dadosAtuais.observacoes}
+                      onChange={(e) => handleChange(equipamentoAtual.id, 'observacoes', e.target.value)}
+                      className={`w-full p-3 border rounded-lg bg-bg-input text-txt-primary text-sm ${dadosAtuais.status === 'defeito' &&
+                        !ehEquipamentoContagem(equipamentoAtual.id) &&
+                        equipamentoAtual.id !== 'VelocidadeWifi' &&
+                        !dadosAtuais.observacoes?.trim()
+                        ? 'border-red-400'
+                        : 'border-border-main'
                         }`}
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold mb-1 text-amber-600 dark:text-amber-400">
-                      Foto do Equipamento *
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) =>
-                        handleChange(equipamentoAtual.id, 'foto', e.target.files?.[0] || null)
-                      }
-                      className="w-full text-xs text-txt-muted file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white"
-                    />
-                    {!dadosAtuais.foto && (
-                      <p className="text-xs text-red-500 mt-1">Foto obrigatória para marcas não listadas.</p>
-                    )}
-                  </div>
-                </div>
+                </>
               )}
-
-              {/* Modelo */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-txt-primary">Modelo</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Galaxy A14 / Vostro 3400"
-                  value={dadosAtuais.modelo}
-                  onChange={(e) => handleChange(equipamentoAtual.id, 'modelo', e.target.value)}
-                  className="w-full p-3 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
-                />
-              </div>
-
-              {/* Patrimônio */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-txt-primary">Patrimônio</label>
-                <input
-                  type="text"
-                  placeholder="Ex: 00123"
-                  value={dadosAtuais.patrimonio}
-                  onChange={(e) => handleChange(equipamentoAtual.id, 'patrimonio', e.target.value)}
-                  className="w-full p-3 border border-border-main rounded-lg bg-bg-input text-txt-primary text-sm"
-                />
-              </div>
-
-              {/* STATUS GERAL - EXIBIDO APENAS SE NÃO FOR MOBSHOP NEM MOBPIN */}
-              {equipamentoAtual.id !== 'Mobshop' && equipamentoAtual.id !== 'Mobpin' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-txt-primary text-left">
-                    Status Geral do Equipamento *
-                  </label>
-
-                  {/* Ajustado para grid-cols-2 e centralizado */}
-                  <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto">
-                    {[
-                      { label: 'OK', val: 'ok' },
-                      { label: 'Defeito', val: 'defeito' },
-                    ].map((st) => (
-                      <button
-                        key={st.val}
-                        type="button"
-                        onClick={() => handleChange(equipamentoAtual.id, 'status', st.val)}
-                        className={`p-2.5 rounded-lg border text-xs font-semibold transition-all flex items-center justify-center text-center ${dadosAtuais.status === st.val
-                          ? 'bg-brand text-white border-brand'
-                          : 'border-border-main text-txt-secondary hover:bg-bg-primary'
-                          }`}
-                      >
-                        {st.label}
-                      </button>
-                    ))}
-                  </div>
-                  {dadosAtuais.status !== 'ok' && dadosAtuais.status !== 'defeito' && (
-                    <p className="text-xs text-red-500 mt-1 text-center">Selecione o status do equipamento.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Observações */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-txt-primary">
-                  Observações
-                  {dadosAtuais.status === 'defeito' && equipamentoAtual.id !== 'Mobshop' && equipamentoAtual.id !== 'Mobpin' && (
-                    <span className="text-red-500"> * (descreva o defeito)</span>
-                  )}
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Algum detalhe adicional..."
-                  value={dadosAtuais.observacoes}
-                  onChange={(e) => handleChange(equipamentoAtual.id, 'observacoes', e.target.value)}
-                  className={`w-full p-3 border rounded-lg bg-bg-input text-txt-primary text-sm ${dadosAtuais.status === 'defeito' &&
-                    equipamentoAtual.id !== 'Mobshop' &&
-                    equipamentoAtual.id !== 'Mobpin' &&
-                    !dadosAtuais.observacoes?.trim()
-                    ? 'border-red-400'
-                    : 'border-border-main'
-                    }`}
-                />
-              </div>
             </div>
           )
         )}

@@ -39,7 +39,7 @@ interface AuditoriaItem {
   equipamentos?: EquipamentoItem[]
 }
 
-const PERFIS_QUE_PODEM_VALIDAR = ['admin', 'gestor', 'auditor_chefe']
+const PERFIS_QUE_PODEM_VALIDAR = ['admin','super-admin']
 
 export default function RelatorioAuditoria() {
   const router = useRouter()
@@ -466,7 +466,7 @@ export default function RelatorioAuditoria() {
                               <th className="p-3">Marca / Modelo</th>
                               <th className="p-3">Patrimônio</th>
                               <th className="p-3">Status</th>
-                              <th className="p-3">Qtd. Módulos</th>
+                              <th className="p-3">Qtd. Aparelhos</th>
                               <th className="p-3">Foto / Anexo</th>
                               <th className="p-3">Observação</th>
                             </tr>
