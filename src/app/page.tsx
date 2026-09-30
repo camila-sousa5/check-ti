@@ -562,7 +562,7 @@ export default function AuditoriaForm() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          emailDestinatario: 'camila.sousa@gruponatureza.com.br',
+          emailDestinatario: 'luan@gruponatureza.com.br',
           unidade: nomeUnidade,
           auditor: usuario?.email,
           tipoUnidade: tipoUnidade,
