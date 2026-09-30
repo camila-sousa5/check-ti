@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CheckTI",
   description: "Formulário para auditória TI",
+  icons: {
+    icon: '/icon.png',
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
