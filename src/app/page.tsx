@@ -447,6 +447,8 @@ export default function AuditoriaForm() {
         }
       }
     }
+    const unidadeObj = unidades.find((u) => u.id === unidadeSelecionada)
+    const nomeUnidade = unidadeObj ? unidadeObj.nome : 'Unidade'
 
     setCarregando(true)
     let auditoriaIdCriada: string | null = null
@@ -554,6 +556,19 @@ export default function AuditoriaForm() {
         if (errEquipamento) throw errEquipamento
       }
 
+      await fetch('/api/notificar-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          emailDestinatario: 'camila.sousa@gruponatureza.com.br',
+          unidade: nomeUnidade,
+          auditor: usuario?.email,
+          tipoUnidade: tipoUnidade,
+        }),
+      })
+
       alert('Auditoria salva com sucesso!')
     } catch (error: any) {
       if (auditoriaIdCriada) {
@@ -563,6 +578,7 @@ export default function AuditoriaForm() {
     } finally {
       setCarregando(false)
     }
+
   }
 
   if (checandoAuth) {
