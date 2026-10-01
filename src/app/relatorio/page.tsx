@@ -41,6 +41,28 @@ interface AuditoriaItem {
 
 const PERFIS_QUE_PODEM_VALIDAR = ['admin','super-admin']
 
+// Alertas da aba "Geral": flag do problema + descrição informada pelo auditor
+const ALERTAS_GERAIS = [
+  {
+    flag: 'problema_internet_sistema',
+    detalhe: 'detalhe_internet_sistema',
+    titulo: '⚠️ Falha de Conexão/Sistema',
+    cor: 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300',
+  },
+  {
+    flag: 'problema_PDV_equipamento',
+    detalhe: 'detalhe_PDV_equipamento',
+    titulo: '🚨 Alerta PDV/Impressora',
+    cor: 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300',
+  },
+  {
+    flag: 'problema_fisico',
+    detalhe: 'detalhe_problema_fisico',
+    titulo: '🔧 Danificação Física',
+    cor: 'bg-orange-500/10 border-orange-500/30 text-orange-800 dark:text-orange-300',
+  },
+] as const
+
 export default function RelatorioAuditoria() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -333,6 +355,7 @@ export default function RelatorioAuditoria() {
               const qtdEquipamentos = aud.equipamentos?.length || 0
               const nomeUnidade = aud.tipo_unidade === 'er' ? aud.er?.nome : aud.lojas?.nome
               const codigoUnidade = aud.tipo_unidade === 'er' ? aud.er?.codigo_er : aud.lojas?.codigo_loja
+              const alertasAtivos = ALERTAS_GERAIS.filter((alerta) => aud[alerta.flag])
 
               return (
                 <div
@@ -427,6 +450,27 @@ export default function RelatorioAuditoria() {
                     </div>
                   </div>
 
+                  {/* DETALHAMENTO DOS ALERTAS RELATADOS PELO AUDITOR */}
+                  {alertasAtivos.length > 0 && (
+                    <div className="border-t border-border-main px-5 py-4 space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-txt-muted">
+                        Alertas relatados pelo auditor
+                      </p>
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                        {alertasAtivos.map((alerta) => (
+                          <div key={alerta.flag} className={`p-3 rounded-lg border text-xs ${alerta.cor}`}>
+                            <p className="font-bold mb-1">{alerta.titulo}</p>
+                            <p className="whitespace-pre-line break-words">
+                              {aud[alerta.detalhe]?.trim() || (
+                                <span className="italic opacity-70">Sem descrição informada.</span>
+                              )}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* PARECER REGISTRADO NA ÚLTIMA VALIDAÇÃO */}
                   {aud.validacao_status === 'ajuste_solicitado' && aud.parecer_supervisor && (
                     <div className="bg-amber-500/10 border-y border-amber-500/20 p-3.5 px-5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
@@ -441,22 +485,6 @@ export default function RelatorioAuditoria() {
                   {/* CONTEÚDO EXPANDIDO */}
                   {estaExpandido && (
                     <div className="border-t border-border-main bg-bg-primary/30 p-5 space-y-4">
-                      {/* Observações dos Problemas */}
-                      {(aud.detalhe_internet_sistema || aud.detalhe_PDV_equipamento || aud.detalhe_problema_fisico) && (
-                        <div className="bg-bg-card text-txt-primary p-3 rounded-lg text-xs space-y-1 border border-border-main shadow-sm">
-                          <p className="font-bold mb-1">Observações da Loja:</p>
-                          {aud.detalhe_internet_sistema && (
-                            <p><strong className="text-txt-muted">Internet/Sistema:</strong> {aud.detalhe_internet_sistema}</p>
-                          )}
-                          {aud.detalhe_PDV_equipamento && (
-                            <p><strong className="text-txt-muted">PDV/Impressoras:</strong> {aud.detalhe_PDV_equipamento}</p>
-                          )}
-                          {aud.detalhe_problema_fisico && (
-                            <p><strong className="text-txt-muted">Danificação Física:</strong> {aud.detalhe_problema_fisico}</p>
-                          )}
-                        </div>
-                      )}
-
                       {/* Tabela de Equipamentos da Loja */}
                       <div className="bg-bg-card text-txt-primary rounded-lg border border-border-main shadow-sm overflow-x-auto">
                         <table className="w-full text-left text-xs">
@@ -525,7 +553,9 @@ export default function RelatorioAuditoria() {
                                       <span className="text-txt-muted">Sem foto</span>
                                     )}
                                   </td>
-                                  <td className="p-3 max-w-xs truncate text-txt-muted">{eq.observacoes || '-'}</td>
+                                  <td className="p-3 min-w-[220px] max-w-md whitespace-pre-line break-words text-txt-muted">
+                                    {eq.observacoes || '-'}
+                                  </td>
                                 </tr>
                               ))
                             )}

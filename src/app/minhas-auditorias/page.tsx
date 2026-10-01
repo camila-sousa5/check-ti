@@ -349,7 +349,7 @@ export default function MinhasAuditorias() {
                                   )}
                                 </td>
 
-                                <td className="p-3 max-w-xs truncate text-txt-muted">
+                                <td className="p-3 min-w-[220px] max-w-md whitespace-pre-line break-words text-txt-muted">
                                   {eq.observacoes || '-'}
                                 </td>
                               </tr>
