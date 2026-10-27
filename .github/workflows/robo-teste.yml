@@ -12,4 +12,4 @@ jobs:
       - name: Disparar robô de teste
         run: |
           curl -sS -f -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://SEU-DOMINIO.vercel.app/api/robo-teste
+            https://check-ti-gruponatureza.vercel.app/api/robo-teste
