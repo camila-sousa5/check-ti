@@ -1,0 +1,15 @@
+name: robo-teste
+
+on:
+  schedule:
+    - cron: '0 11,23 * * *'   # 08:00 (loja) e 20:00 (ER) em Brasília
+  workflow_dispatch:           # permite rodar manualmente pela aba Actions
+
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar robô de teste
+        run: |
+          curl -sS -f -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://SEU-DOMINIO.vercel.app/api/robo-teste
